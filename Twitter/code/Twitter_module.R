@@ -26,15 +26,15 @@ library(lubridate)
 library(stringr)
 library(base64enc)
 
-#' uncommenting the following lines may help install twitteR package
+#' if the twitteR package doesn't install initially, uncommenting the following lines may help 
 #install.packages("devtools")
 #library(devtools)
 #devtools::install_github("jrowen/twitteR", ref = "oauth_httr_1_0")
 
 #' Pablo Barbera, author of streamR, has written additional functions for Twitter analysis
 #' uncomment the two commands below to download and add these functions to your environment with source
-#download.file("https://raw.githubusercontent.com/pablobarbera/social-media-workshop/master/functions.r", "../src/functions_by_pablobarbera.R")
-#source("../src/functions_by_pablobarbera.R")
+#download.file("https://raw.githubusercontent.com/pablobarbera/social-media-workshop/master/functions.r","../src/functions_by_pablobarbera.R")
+source("../src/functions_by_pablobarbera.R")
 
 #' few functions to clean data
 source("../src/twitterFunctions.R") 
@@ -58,19 +58,22 @@ authURL<- "https://api.twitter.com/oauth/authorize"
 twitCred<- OAuthFactory$new(consumerKey=twitter_api_key,consumerSecret=twitter_api_secret,
                             requestURL=reqURL,accessURL=accessURL,authURL=authURL)
 
-#' insert the number in the R console after you run this line
+#' the `twitCred$handshake` will open a window in your browser and ask you to authorize your application
+#' insert the pin number you receive after authorizing in the R console
+twitCred$handshake(cainfo = system.file("CurlSSL", "cacert.pem", package = "RCurl"))
+
 #' save authenticated credentials for later sessions
 #' for later use, uncomment the following command in a folder that contains twitCred.RData
 #load(twitCred)
-twitCred$handshake(cainfo = system.file("CurlSSL", "cacert.pem", package = "RCurl"))
 save(twitCred, file = "twitCred.RData")
 
-#' setup direct twitter authentication for twitteR functions
-#' you will be prompted to cache authentication token
-#' you will need to repeat this step unless you are running analysis from a location with a
-#' cached authentication token 
+#' setup direct Twitter authentication for twitteR package functions
+#' you will be prompted to cache an authentication token (.httr-oauth)
+#' you will need to reselect direct authentication when you run `setup_twitter_oauth`
+#' unless you are running an analysis from a location with a cached authentication token 
 setup_twitter_oauth(twitter_api_key, twitter_api_secret,
                     twitter_access_token, twitter_access_token_secret)
+
 ## Gather Data ##  
 
 ### Search tweets by location ###
@@ -95,6 +98,12 @@ getCommonHashtags(Frankfurt_tweets$name)
 #' The streamR functions interact with Twitter's Streaming API to filter tweets by keywords, users, language, and location. 
 #' See the streamR vignette  by Pablo Barbera for more information about the package.  
 
+#' make a data folder to store downloaded tweets
+#' Windows users may have to manually create a data folder
+system("mkdir ../data")
+
+#' #' create a streaming object to download tweets
+#' this object can be called again and will append new tweets to the existing file
 physical_activity_tweets_stream<-filterStream("../data/physical_activity_tweets.json",
                                              timeout = 120, language = "en", 
                                              track = c("#walking, #biking, #running, 
@@ -114,41 +123,52 @@ tweet_user_created_at=physical_activity_tweets[names(physical_activity_tweets)==
 tweet_pic_url=physical_activity_tweets[names(physical_activity_tweets)=="user.profile_image_url"]
 tweet_text=physical_activity_tweets[names(physical_activity_tweets)=="text"]
 
+
 #' removing "_normal"" from url for figure details estimates
 tweet_pic_url<-gsub("_normal", "", tweet_pic_url)
 
 #' make a table of users, profile urls and tweet text
 tweets_img_table= tbl_df(data.frame(tweet_user_name,tweet_user_id,
-                                    tweet_user_created_at,tweet_pic_url, tweet_text))
+                                    tweet_user_created_at,tweet_pic_url))
 head(tweets_img_table)
-write.csv(tweets_img_table, "../data/tweets_img_table.csv")
+
 #' alternative way to make a table of users and profile urls
 #' use if character vectors for user name, id, created at or picture url are not equal
-#tweets_table <- tbl_df(matrix(NA,length(tweet_user_name),5))
-#colnames(tweets_img_table)<-c("user_name", "user_id",  "user_created_at","tweet_pic_url", "tweet_text")
+#tweets_table <- tbl_df(matrix(NA,length(tweet_user_name),4))
+#colnames(tweets_img_table)<-c("user_name", "user_id",  "user_created_at","tweet_pic_url")
 #for (i in 1:length(tweet_user_name)){
 # tweets_img_table[i,1]<-tweet_user_name[i]
 # tweets_img_table[i,2]<-tweet_user_id[i]
 # tweets_img_table[i,3]<-tweet_user_created_at[i]
 # tweets_img_table[i,4]<-tweet_pic_url[i]
-# tweets_img_table[i,5]<-tweet_texts[i]
 #}
-#head(tweets_img_table)
+#glimpse(tweets_img_table)
+
 
 #' use Twitter_face_plus_plus.R here to create Face++ API demographic estimates
 #' join tweets_img_table with Face++ demographic estimates
 #' convert user_created_at into lubridate object with lubridate_tweet_datestring function
-#' example of advantages of lubridate object: plotting,algebraic manipulation on date-time objects.
-#tweets_img_table$user_timestamp = sapply(tweets_img_table$user_created_at,lubridate_tweet_datestring)
-#drops = "user_created_at"
-#tweets_img_table = tweets_img_table[, !(names(tweets_img_table) %in% drops)]
-#tweets_img_table = dplyr::rename(tweets_img_table, user_created_at = user_timestamp)
-#tweets_img_table = dplyr::rename(tweets_img_table, name = tweet_user_name)
-#face_plus_plus_table = tbl_df(read.csv("../data/face_plus_plus_estimates.csv"))
+#' example of advantages of lubridate object: plotting, algebraic manipulation on date-time objects.
+# i <- sapply(tweets_img_table, is.factor)
+# tweets_img_table[i] <- lapply(tweets_img_table[i], as.character)
+# tweets_img_table$user_timestamp = strptime(sapply(tweets_img_table$tweet_user_created_at,lubridate_tweet_datestring), format = "%m-%d-%Y %H:%M")
+# drops = "tweet_user_created_at"
+# tweets_img_table = tweets_img_table[, !(names(tweets_img_table) %in% drops)]
+# tweets_img_table = dplyr::rename(tweets_img_table, user_created_at = user_timestamp)
+# tweets_img_table = dplyr::rename(tweets_img_table, name = tweet_user_name)
+# hist(year(tweets_img_table$user_created_at))
+# write.csv(tweets_img_table, "data/tweets_img_table.csv")
+
+
+#' see Twitter_face_plus_plus.R to create face_plus_plus_table
+#face_plus_plus_table = tbl_df(read.csv("data/face_plus_plus_estimates.csv"))
 #tweets_table =  inner_join(tweets_img_table, face_plus_plus_table, by = "name")
+#write.csv(tweets_table, "data/physical_activity_tweets.csv", row.names = FALSE)
 
-#write.csv(tweets_table, "../data/physical_activity_tweets.csv", row.names = FALSE)
+physical_activity_tweets = tbl_df(read.csv("data/physical_activity_tweets.csv"))
 
+#' unzip physical_activity_tweets.zip
+#' place physical_activity_tweets.csv in the data folder you created earlier
 physical_activity_tweets = tbl_df(read.csv("../data/physical_activity_tweets.csv"))
 
 ## View summary statistics ## 
@@ -203,11 +223,20 @@ glimpse(neg)
 ### Sentiment scores by demographic group ##
 #' Compute a simple sentiment score for each tweet 
 #' sentiment score = number of positive words  minus number of negative words
-scores_male<- score.sentiment(male_tweets$text,pos, neg)$score 
-scores_female <- score.sentiment(female_tweets$text,pos, neg)$score 
-scores_black<- score.sentiment(black_tweets$text,pos, neg)$score 
-scores_white <- score.sentiment(white_tweets$text,pos, neg)$score 
-scores_asian <- score.sentiment(asian_tweets$text,pos, neg)$score
+
+#' to save time, sample 1000 tweets from each demographic subset for sentiment scores
+male_tweets_sample =  sample_n(male_tweets, 1000)
+female_tweets_sample =  sample_n(female_tweets, 1000)
+black_tweets_sample =  sample_n(black_tweets, 1000)
+white_tweets_sample =  sample_n(white_tweets, 1000)
+asian_tweets_sample =  sample_n(asian_tweets, 1000)
+
+#' sentiment scores
+scores_male<- score.sentiment(male_tweets_sample$text,pos, neg)$score 
+scores_female <- score.sentiment(female_tweets_sample$text,pos, neg)$score 
+scores_black<- score.sentiment(black_tweets_sample$text,pos, neg)$score 
+scores_white <- score.sentiment(white_tweets_sample$text,pos, neg)$score 
+scores_asian <- score.sentiment(asian_tweets_sample$text,pos, neg)$score
 
 ## Average sentiment by demographic background ##
 #' sentiment score table
@@ -215,17 +244,17 @@ group_names <- c("male", "female", "black", "white", "asian")
 group_score_values<-round(rbind(mean(scores_male),mean(scores_female),mean(scores_black), mean(scores_white), mean(scores_asian)),2)
 group_score_sd<-round(rbind(sd(scores_male),sd(scores_female),sd(scores_black), sd(scores_white), sd(scores_asian)),2)
 
-group_score_df = tbl_df(cbind(group_names, group_score_values, group_score_sd))
+group_score_df = tbl_df(as.data.frame(cbind(group_names, group_score_values, group_score_sd)))
 colnames(group_score_df) = c("group", "mean score", "score st. dev")
 group_score_df
 
 ### Save workspace ### 
 #'Save all objects in your current workspace and read back from file in the future
-save.image(file = "EPC2016-Mainz-Twitter.RData")
+save.image(file = "../src/EPC2016-Mainz-Twitter.RData")
 
 #' future R sessions will require you to reload necessary libraries
 #' uncomment the command below to load saved objects in future workspace sessions
-#load("EPC2016-Mainz-Twitter.RData")
+#load("../src/EPC2016-Mainz-Twitter.RData")
 
 
 # Acknowledgements #
